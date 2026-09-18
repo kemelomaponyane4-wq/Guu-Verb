@@ -1,36 +1,32 @@
 #pragma once
-#include <juce_dsp/juce_dsp.h>
-#include <array>
-#include <random>
-
-class FDNReverb {
+#include <JuceHeader.h>
+class MyFDNReverb {
 public:
-    void prepare(double sr, int maxBlock){
-        sampleRate = sr;
-        for(auto& d: delays) d.prepare({sr, (juce::uint32)maxBlock, 1});
-        for(auto& f: filters) f.prepare({sr, (juce::uint32)maxBlock, 1});
-        setSize(0.95f); setDamping(0.4f);
-        std::mt19937 rng(42);
-        std::uniform_real_distribution<float> dist(0.02f, 0.08f);
-        for(int i=0;i<8;i++) delays[i].setDelay((dist(rng)+i*0.015f)*sampleRate);
+    void prepare(double sr,int maxBlock){
+        for(auto& d: delays) d.prepare({sr,(juce::uint32)maxBlock,(juce::uint32)(sr*4)});
     }
-    void setSize(float s){ for(auto& d: delays) d.setFeedback(s*0.99f); }
-    void setDamping(float dmp){
-        for(auto& f: filters){ f.setType(juce::dsp::StateVariableTPTFilterType::lowpass); f.setCutoffFrequency(20000.0f * (1.0f - dmp*0.9f)); }
-    }
+    void setSize(float s){ size = juce::jlimit(0.0f,1.0f,s); }
+    void setDamping(float d){ damp = juce::jlimit(0.0f,1.0f,d); }
     void process(juce::AudioBuffer<float>& buf){
-        for(int ch=0; ch<buf.getNumChannels(); ++ch){
-            auto* data = buf.getWritePointer(ch);
-            for(int s=0; s<buf.getNumSamples(); ++s){
-                float in = data[s];
-                float out = 0;
-                for(int i=0;i<8;i++){ float dl = delays[i].popSample(0); dl = filters[i].processSample(0, dl); out+=dl; delays[i].pushSample(0, in + dl*0.7f); }
-                data[s] = out*0.12f + in*0.3f;
+        auto* l = buf.getWritePointer(0);
+        auto* r = buf.getNumChannels()>1? buf.getWritePointer(1):nullptr;
+        for(int i=0;i<buf.getNumSamples();++i){
+            float inL = l[i];
+            float inR = r? r[i]:inL;
+            float outL=0,outR=0;
+            for(int j=0;j<8;++j){
+                float dly = delays[j].popSample(0);
+                float fb = dly * (0.68f + size*0.30f) * (1.0f - damp*0.3f);
+                if(j%2==0) delays[j].pushSample(0, inL*0.12f + fb);
+                else delays[j].pushSample(0, inR*0.12f + fb);
+                outL += dly * (j<4?0.28f:0.05f);
+                outR += dly * (j>=4?0.28f:0.05f);
             }
+            l[i] = l[i]*0.5f + outL*0.6f;
+            if(r) r[i] = r[i]*0.5f + outR*0.6f;
         }
     }
 private:
-    double sampleRate=48000;
-    std::array<juce::dsp::DelayLine<float>,8> delays;
-    std::array<juce::dsp::StateVariableTPTFilter<float>,8> filters;
+    float size=0.92f,damp=0.35f;
+    std::array<juce::dsp::DelayLine<float,juce::dsp::DelayLineInterpolationTypes::Linear>,8> delays;
 };
