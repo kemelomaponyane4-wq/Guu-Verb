@@ -1,36 +1,25 @@
-#pragma once
-#include <JuceHeader.h>
-class MyFDNReverb {
-public:
-    void prepare(double sr,int maxBlock){
-        sampleRate = sr;
-        for(auto& d: delays) d.prepare({sr,(juce::uint32)maxBlock,(juce::uint32)(sr*4.0)});
-        for(auto& f: filters) f.prepare({sr,(juce::uint32)maxBlock,2});
-    }
-    void setSize(float s){ size = juce::jlimit(0.0f,1.0f,s); }
-    void setDamping(float d){ damp = juce::jlimit(0.0f,1.0f,d); }
-    void process(juce::AudioBuffer<float>& buf){
-        auto* l = buf.getWritePointer(0);
-        auto* r = buf.getNumChannels()>1? buf.getWritePointer(1) : nullptr;
-        for(int i=0;i<buf.getNumSamples();++i){
-            float inL = l[i];
-            float inR = r? r[i] : inL;
-            float outL=0,outR=0;
-            for(int j=0;j<8;++j){
-                float d = delays[j].popSample(0);
-                float fb = d * (0.65f + size*0.32f) * (1.0f - damp*0.3f);
-                if(j%2==0) delays[j].pushSample(0, inL*0.15f + fb);
-                else delays[j].pushSample(0, inR*0.15f + fb);
-                outL += d * (j<4?0.3f:0.0f);
-                outR += d * (j>=4?0.3f:0.0f);
-            }
-            l[i] = l[i]*0.5f + outL*0.5f;
-            if(r) r[i] = r[i]*0.5f + outR*0.5f;
-        }
-    }
-private:
-    double sampleRate=44100;
-    float size=0.9f,damp=0.4f;
-    std::array<juce::dsp::DelayLine<float,juce::dsp::DelayLineInterpolationTypes::Linear>,8> delays;
-    std::array<juce::dsp::IIR::Filter<float>,4> filters;
-};
+name: Build VST3
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone JUCE 8.0.6
+        run: git clone --depth 1 --branch 8.0.6 https://github.com/juce-framework/JUCE.git
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Upload VST3 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GuuVerb-VST3
+          path: |
+            build/**/*.vst3
+            build/**/GuuVerb.vst3
