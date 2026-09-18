@@ -1,25 +1,18 @@
 name: Build VST3
 on: [push]
-
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Clone JUCE 8.0.6
+      - name: Clone JUCE
         run: git clone --depth 1 --branch 8.0.6 https://github.com/juce-framework/JUCE.git
-
-      - name: Configure CMake
+      - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build VST3
-        run: cmake --build build --config Release --parallel 4
-
-      - name: Upload VST3 Artifact
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
           name: GuuVerb-VST3
-          path: |
-            build/**/*.vst3
-            build/**/GuuVerb.vst3
+          path: build/**/*.vst3
