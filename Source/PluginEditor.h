@@ -2,9 +2,9 @@
 #include "PluginProcessor.h"
 class GuuVerbEditor : public juce::AudioProcessorEditor {
 public:
-    GuuVerbEditor(GuuVerbAudioProcessor&);
+    explicit GuuVerbEditor(GuuVerbAudioProcessor&);
     void paint(juce::Graphics&) override;
-    void resized() override;
+    void resized() override {}
 private:
-    GuuVerbAudioProcessor& p;
+    GuuVerbAudioProcessor& proc;
 };
